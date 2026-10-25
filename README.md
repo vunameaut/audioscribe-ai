@@ -20,7 +20,7 @@ Hỗ trợ gỡ băng lời thoại, tách người nói (Speaker Diarization) v
    - **Diễn biến thảo luận theo chủ đề**: Chi tiết các vấn đề được đưa ra tranh luận.
 
 3. **Hai Chế Độ Xử Lý Linh Hoạt**:
-   - **Gemini Cloud AI (Khuyên dùng)**: Sử dụng Gemini File API (Gemini 2.5 Flash / 1.5 Flash), xử lý file > 1 giờ chỉ mất 1-2 phút, độ chính xác tiếng Việt 99%, hiểu tiếng lóng và ngữ cảnh hoàn hảo. Hỗ trợ lấy API Key miễn phí từ Google AI Studio.
+   - **Gemini Cloud AI (Khuyên dùng)**: Sử dụng Gemini File API (Gemini 3.5 Flash / 3.8 Flash), xử lý file > 1 giờ chỉ mất 1-2 phút, độ chính xác tiếng Việt 99%, hiểu tiếng lóng và ngữ cảnh hoàn hảo. Hỗ trợ lấy API Key miễn phí từ Google AI Studio.
    - **Local Whisper (Offline)**: Chạy hoàn toàn trên card đồ họa máy tính (NVIDIA GeForce RTX 3050 CUDA), bảo mật nội bộ 100%, không cần kết nối mạng.
 
 4. **Trình Phát Audio Đồng Bộ (Interactive Audio Player)**:
