@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioScribe AI - Chuyển Âm Thanh & Tóm Tắt Đa Người Nói</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+    <!-- Background Animated Glow Orbs -->
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+
+    <!-- Main App Container -->
+    <div class="app-layout">
+        <!-- Top Navigation -->
+        <header class="navbar">
+            <div class="brand">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-waveform-lines"></i>
+                    <span class="pulse-ring"></span>
+                </div>
+                <div class="brand-text">
+                    <h1>AudioScribe <span class="gradient-text">AI</span></h1>
+                    <span class="sub-tag">Nhận diện đa người nói & Tóm tắt cuộc họp thông minh</span>
+                </div>
+            </div>
+
+            <div class="nav-controls">
+                <div id="gpu-badge" class="badge badge-gpu" title="Trạng thái GPU">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span id="gpu-text">NVIDIA RTX 3050</span>
+                </div>
+
+                <button id="btn-open-settings" class="btn btn-glass" title="Cài đặt API Key">
+                    <i class="fa-solid fa-key"></i>
+                    <span id="api-key-indicator" class="status-dot"></span>
+                    <span class="btn-label">Cài đặt API</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- 1. Upload & Setup Section -->
+            <section id="setup-section" class="card setup-card">
+                <div class="card-header">
+                    <div class="header-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="header-titles">
+                        <h2>Tải Lên File Âm Thanh Cuộc Trò Chuyện</h2>
+                        <p>Hỗ trợ file ghi âm dài hơn 1 giờ (MP3, M4A, WAV, AAC, MP4, WebM). AI tự động nhận diện từng người nói và trích xuất điểm cốt lõi.</p>
+                    </div>
+                </div>
+
+                <!-- Dropzone -->
+                <div id="dropzone" class="dropzone">
+                    <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm" hidden>
+                    <div class="dropzone-content">
+                        <div class="upload-icon-wrapper">
+                            <i class="fa-solid fa-file-audio"></i>
+                        </div>
+                        <h3>Kéo thả file âm thanh vào đây hoặc <span class="highlight-link">Chọn file từ máy tính</span></h3>
+                        <p class="dropzone-hint">Hỗ trợ MP3, M4A, WAV, AAC... Tối ưu cho file dài nhiều người nói</p>
+                    </div>
+
+                    <!-- File Info Card (Hidden initially) -->
+                    <div id="file-info-preview" class="file-preview-box hidden">
+                        <div class="file-info-meta">
+                            <i class="fa-solid fa-circle-check check-icon"></i>
+                            <div class="meta-texts">
+                                <span id="file-name" class="name">meeting_recording.mp3</span>
+                                <div class="sub-badges">
+                                    <span id="file-size" class="pill-info">65.4 MB</span>
+                                    <span id="file-duration" class="pill-info">01:14:32</span>
+                                    <span id="file-format" class="pill-info">MP3 • 44.1kHz</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="btn-remove-file" class="btn-icon danger" title="Chọn file khác">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Audio Scrubber Preview (If file loaded) -->
+                <div id="audio-preview-container" class="audio-preview-strip hidden">
+                    <audio id="audio-preview-player" controls preload="metadata"></audio>
+                </div>
+
+                <!-- Processing Mode Selection -->
+                <div class="options-grid">
+                    <div class="option-group">
+                        <label class="group-label"><i class="fa-solid fa-sliders"></i> Chế độ xử lý:</label>
+                        <div class="mode-selector">
+                            <label class="mode-card active" data-mode="gemini">
+                                <input type="radio" name="proc_mode" value="gemini" checked>
+                                <div class="mode-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                                <div class="mode-info">
+                                    <strong>Gemini AI (Khuyên dùng)</strong>
+                                    <span>Cực nhanh (~1-2 phút), nhận diện người nói tiếng Việt chuẩn 99%, tóm tắt điều hành siêu thông minh</span>
+                                </div>
+                                <div class="mode-check"><i class="fa-solid fa-circle-check"></i></div>
+                            </label>
+
+                            <label class="mode-card" data-mode="local">
+                                <input type="radio" name="proc_mode" value="local">
+                                <div class="mode-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                                <div class="mode-info">
+                                    <strong>Local Whisper (Offline)</strong>
+                                    <span>Chạy trực tiếp trên GPU máy tính RTX 3050, 100% bảo mật nội bộ, không cần gửi file qua mạng</span>
+                                </div>
+                                <div class="mode-check"><i class="fa-solid fa-circle-check"></i></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Custom Hints & Context -->
+                    <div class="option-group">
+                        <label class="group-label"><i class="fa-solid fa-user-group"></i> Thông tin cuộc trò chuyện (Tùy chọn):</label>
+                        <div class="fields-row">
+                            <div class="field-item">
+                                <label for="input-speakers-count">Số người nói dự kiến:</label>
+                                <select id="input-speakers-count" class="form-input">
+                                    <option value="">Tự động nhận diện tất cả</option>
+                                    <option value="2">2 người</option>
+                                    <option value="3">3 người</option>
+                                    <option value="4">4 người</option>
+                                    <option value="5">5 người trở lên</option>
+                                </select>
+                            </div>
+                            <div class="field-item">
+                                <label for="input-speaker-hints">Tên hoặc vai trò các người nói:</label>
+                                <input type="text" id="input-speaker-hints" class="form-input" placeholder="Ví dụ: Anh Nam (Chủ trì), Chị Mai (Kế toán), Tuấn (Kỹ thuật)">
+                            </div>
+                        </div>
+
+                        <div class="field-item mt-3">
+                            <label for="input-meeting-context">Chủ đề hoặc ngữ cảnh thảo luận:</label>
+                            <input type="text" id="input-meeting-context" class="form-input" placeholder="Ví dụ: Họp kế hoạch triển khai marketing quý 4, đánh giá rủi ro ngân sách...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="submit-wrapper">
+                    <button id="btn-start-process" class="btn btn-primary btn-large" disabled>
+                        <span class="btn-shine"></span>
+                        <i class="fa-solid fa-bolt"></i>
+                        <span>BẮT ĐẦU NHẬN DIỆN & TÓM TẮT THÔNG MINH</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 2. Live Progress Section (Hidden initially) -->
+            <section id="progress-section" class="card progress-card hidden">
+                <div class="progress-header">
+                    <div class="spinner-pulse">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
+                    <div class="progress-titles">
+                        <h3 id="progress-message">Đang khởi động tiến trình xử lý...</h3>
+                        <p id="progress-sub">Hệ thống đang phân tích tín hiệu giọng nói của từng thành viên</p>
+                    </div>
+                    <div class="progress-timer">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="timer-display">00:00</span>
+                    </div>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 10%;"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="progress-pct">10%</span>
+                    <span class="hint-text">File âm thanh hơn 1 tiếng thường mất khoảng 1-3 phút qua Gemini</span>
+                </div>
+
+                <!-- Visual Step Stages -->
+                <div class="steps-indicator">
+                    <div class="step-node active" id="step-1">
+                        <div class="node-circle"><i class="fa-solid fa-file-import"></i></div>
+                        <span>1. Chuẩn bị file</span>
+                    </div>
+                    <div class="step-line" id="line-1"></div>
+                    <div class="step-node" id="step-2">
+                        <div class="node-circle"><i class="fa-solid fa-users-viewfinder"></i></div>
+                        <span>2. Tách người nói</span>
+                    </div>
+                    <div class="step-line" id="line-2"></div>
+                    <div class="step-node" id="step-3">
+                        <div class="node-circle"><i class="fa-solid fa-brain"></i></div>
+                        <span>3. Tóm tắt & Trích xuất</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Results Dashboard (Hidden initially) -->
+            <section id="results-section" class="results-layout hidden">
+                <!-- Top Summary Header Bar -->
+                <div class="results-header-card">
+                    <div class="title-cluster">
+                        <span class="badge-success"><i class="fa-solid fa-check-double"></i> Đã xử lý xong</span>
+                        <h2 id="result-meeting-title">Biên bản tổng hợp cuộc trò chuyện</h2>
+                        <div class="meeting-meta-chips">
+                            <span class="meta-chip"><i class="fa-regular fa-clock"></i> <span id="res-duration">--:--</span></span>
+                            <span class="meta-chip"><i class="fa-solid fa-users"></i> <span id="res-speakers-count">0 người nói</span></span>
+                            <span class="meta-chip"><i class="fa-solid fa-comments"></i> <span id="res-turns-count">0 lượt phát biểu</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Export Buttons Group -->
+                    <div class="export-group">
+                        <div class="dropdown-wrapper">
+                            <button class="btn btn-export">
+                                <i class="fa-solid fa-file-export"></i>
+                                <span>Xuất Kết Quả</span>
+                                <i class="fa-solid fa-chevron-down ml-2"></i>
+                            </button>
+                            <div class="dropdown-menu">
+                                <a href="#" class="dropdown-item" data-export="docx">
+                                    <i class="fa-solid fa-file-word text-blue"></i>
+                                    <div>
+                                        <strong>Microsoft Word (.docx)</strong>
+                                        <small>Bản in chuyên nghiệp, bảng việc, màu người nói</small>
+                                    </div>
+                                </a>
+                                <a href="#" class="dropdown-item" data-export="md">
+                                    <i class="fa-solid fa-file-code text-indigo"></i>
+                                    <div>
+                                        <strong>Markdown (.md)</strong>
+                                        <small>Tối ưu lưu trữ Notion, Obsidian, GitHub</small>
+                                    </div>
+                                </a>
+                                <a href="#" class="dropdown-item" data-export="txt">
+                                    <i class="fa-solid fa-file-lines text-slate"></i>
+                                    <div>
+                                        <strong>Văn bản thô (.txt)</strong>
+                                        <small>File text nhẹ, mở trên mọi thiết bị</small>
+                                    </div>
+                                </a>
+                                <a href="#" class="dropdown-item" data-export="srt">
+                                    <i class="fa-solid fa-closed-captioning text-emerald"></i>
+                                    <div>
+                                        <strong>Phụ đề Subtitle (.srt)</strong>
+                                        <small>Phụ đề Premiere, CapCut, DaVinci</small>
+                                    </div>
+                                </a>
+                                <a href="#" class="dropdown-item" data-export="json">
+                                    <i class="fa-solid fa-code text-amber"></i>
+                                    <div>
+                                        <strong>Dữ liệu JSON (.json)</strong>
+                                        <small>Dữ liệu cấu trúc gốc kèm mốc thời gian</small>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+
+                        <button id="btn-restart" class="btn btn-glass" title="Xử lý file khác">
+                            <i class="fa-solid fa-arrow-rotate-right"></i>
+                            <span>Làm mới</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Synchronized Audio Player Bar -->
+                <div class="sticky-player-bar">
+                    <div class="player-left">
+                        <button id="btn-player-play" class="btn-play-round">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                        <div class="player-time-display">
+                            <span id="player-current-time">00:00</span>
+                            <span class="sep">/</span>
+                            <span id="player-total-time">00:00</span>
+                        </div>
+                    </div>
+                    <div class="player-middle">
+                        <input type="range" id="player-scrubber" min="0" max="100" value="0" step="0.1">
+                        <div id="player-speaking-indicator" class="speaking-now-badge hidden">
+                            <span class="dot-live"></span>
+                            <span id="speaking-now-name">Người nói 1</span>
+                        </div>
+                    </div>
+                    <div class="player-right">
+                        <button id="btn-speed" class="btn-speed-toggle" title="Tốc độ phát">1.0x</button>
+                        <div class="volume-slider-box">
+                            <i class="fa-solid fa-volume-high"></i>
+                            <input type="range" id="player-volume" min="0" max="1" step="0.05" value="1">
+                        </div>
+                    </div>
+                    <!-- Audio element -->
+                    <audio id="main-audio-player" preload="auto"></audio>
+                </div>
+
+                <!-- Tabs Navigation Bar -->
+                <div class="tabs-nav">
+                    <button class="tab-btn active" data-tab="tab-summary">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>1. Tóm Tắt & Điểm Then Chốt</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tab-transcript">
+                        <i class="fa-solid fa-microphone-lines"></i>
+                        <span>2. Bản Gỡ Băng Lời Thoại</span>
+                        <span id="tab-transcript-count" class="badge-count">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tab-chat">
+                        <i class="fa-solid fa-comments-question"></i>
+                        <span>3. Trợ Lý AI Hỏi & Đáp</span>
+                    </button>
+                </div>
+
+                <!-- Tab 1: Executive Summary -->
+                <div id="tab-summary" class="tab-pane active">
+                    <!-- Overview Card -->
+                    <div class="summary-card">
+                        <div class="sec-title"><i class="fa-solid fa-sparkles text-amber"></i> Bối Cảnh & Tổng Quan Cuộc Trò Chuyện</div>
+                        <p id="sum-overview" class="overview-text">Đang tải...</p>
+                        <div id="sum-tags-container" class="tags-cluster"></div>
+                    </div>
+
+                    <!-- Two-column Grid: Decisions & Action Items -->
+                    <div class="summary-two-col">
+                        <!-- Decisions -->
+                        <div class="summary-card decisions-card">
+                            <div class="sec-title"><i class="fa-solid fa-circle-check text-emerald"></i> Các Quyết Định & Thống Nhất Chính</div>
+                            <ul id="sum-decisions-list" class="styled-list">
+                                <li>Đang phân tích...</li>
+                            </ul>
+                        </div>
+
+                        <!-- Action Items -->
+                        <div class="summary-card actions-card">
+                            <div class="sec-title"><i class="fa-solid fa-list-check text-indigo"></i> Danh Sách Việc Cần Làm (Action Items)</div>
+                            <div class="table-responsive">
+                                <table class="actions-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Người phụ trách</th>
+                                            <th>Nhiệm vụ cần triển khai</th>
+                                            <th>Thời hạn</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sum-actions-body">
+                                        <tr><td colspan="3">Không có việc cần làm</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Speaker Viewpoints & Breakdown -->
+                    <div class="summary-card viewpoints-card">
+                        <div class="sec-title"><i class="fa-solid fa-users text-blue"></i> Quan Điểm & Đóng Góp Theo Từng Người Nói</div>
+                        <div id="sum-speakers-viewpoints" class="viewpoints-grid">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Detailed Key Topics -->
+                    <div class="summary-card topics-card">
+                        <div class="sec-title"><i class="fa-solid fa-sitemap text-violet"></i> Diễn Biến Thảo Luận Chi Tiết Theo Chủ Đề</div>
+                        <div id="sum-topics-container" class="topics-accordion">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Full Transcript -->
+                <div id="tab-transcript" class="tab-pane">
+                    <!-- Toolbar: Search & Filter -->
+                    <div class="transcript-toolbar">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="transcript-search" placeholder="Tìm kiếm từ khóa trong cuộc trò chuyện...">
+                            <button id="btn-clear-search" class="btn-clear hidden"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+
+                        <div class="speaker-filter-cluster">
+                            <span class="filter-label">Lọc theo người:</span>
+                            <div id="speaker-filter-pills" class="filter-pills">
+                                <button class="pill active" data-speaker="all">Tất cả</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transcript Feed -->
+                    <div id="transcript-feed" class="transcript-feed">
+                        <!-- Segments rendered here -->
+                    </div>
+                </div>
+
+                <!-- Tab 3: AI Assistant Q&A Chat -->
+                <div id="tab-chat" class="tab-pane">
+                    <div class="chat-container">
+                        <div class="chat-intro">
+                            <div class="chat-intro-icon"><i class="fa-solid fa-robot"></i></div>
+                            <h3>Hỏi Đáp Trực Tiếp Về Nội Dung Ghi Âm</h3>
+                            <p>Bạn có thể hỏi bất kỳ câu hỏi nào. AI sẽ đối chiếu toàn bộ băng ghi âm để trả lời chính xác kèm người phát biểu và mốc thời gian.</p>
+                            <div class="quick-prompts">
+                                <button class="quick-prompt-btn" data-prompt="Tóm tắt ngắn gọn 3 ý chính quan trọng nhất?">💡 3 ý chính quan trọng nhất</button>
+                                <button class="quick-prompt-btn" data-prompt="Có những cam kết hay deadline nào được đề cập?">⏰ Các cam kết & deadline</button>
+                                <button class="quick-prompt-btn" data-prompt="Các thành viên có điểm nào bất đồng ý kiến không?">⚖️ Những điểm bất đồng quan điểm</button>
+                                <button class="quick-prompt-btn" data-prompt="Liệt kê toàn bộ các con số và chi phí được nhắc đến?">💰 Các con số & chi phí</button>
+                            </div>
+                        </div>
+
+                        <div id="chat-messages" class="chat-messages">
+                            <!-- Messages rendered dynamically -->
+                        </div>
+
+                        <div class="chat-input-bar">
+                            <textarea id="chat-input" placeholder="Nhập câu hỏi về cuộc họp... (Nhấn Enter để gửi)" rows="1"></textarea>
+                            <button id="btn-send-chat" class="btn btn-primary btn-send">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>AudioScribe AI • Chuyển đổi âm thanh dài & Tổng hợp tóm tắt chuyên sâu đa người nói</p>
+        </footer>
+    </div>
+
+    <!-- Rename Speaker Modal -->
+    <div id="modal-rename-speaker" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-pen"></i> Đổi Tên Người Nói</h3>
+                <button class="btn-close-modal" id="btn-close-rename-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>Đổi tên sẽ tự động cập nhật đồng bộ trong bản gỡ băng, bảng tóm tắt và file xuất ra Word/Markdown.</p>
+                <div class="form-group mt-3">
+                    <label>Tên hiện tại:</label>
+                    <input type="text" id="rename-old-name" class="form-input" disabled>
+                </div>
+                <div class="form-group mt-3">
+                    <label>Tên thực tế mới (Ví dụ: Anh Nam, Sếp Hùng, Chị Mai):</label>
+                    <input type="text" id="rename-new-name" class="form-input" placeholder="Nhập tên mới...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-glass" id="btn-cancel-rename">Hủy</button>
+                <button class="btn btn-primary" id="btn-confirm-rename">Lưu Thay Đổi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings API Key Modal -->
+    <div id="modal-settings" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-gear"></i> Cấu Hình Gemini API Key</h3>
+                <button class="btn-close-modal" id="btn-close-settings-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert-box">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <div>
+                        <strong>Miễn phí & Cực nhanh:</strong> Gemini API hỗ trợ xử lý file âm thanh lên đến 9.5 giờ với độ chính xác tiếng Việt vượt trội.
+                    </div>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label for="input-api-key">Google Gemini API Key:</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="input-api-key" class="form-input" placeholder="AIzaSy...">
+                        <button type="button" id="btn-toggle-key-visibility" class="btn-icon"><i class="fa-solid fa-eye"></i></button>
+                    </div>
+                    <small class="hint-link">
+                        Chưa có key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Lấy API Key hoàn toàn miễn phí tại Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                    </small>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label for="select-gemini-model">Mô hình AI Gemini:</label>
+                    <select id="select-gemini-model" class="form-input">
+                        <option value="gemini-3.5-flash">Gemini 3.5 Flash (Khuyên dùng - Cực nhanh & Chuẩn tiếng Việt)</option>
+                        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Thế hệ mới nhất)</option>
+                        <option value="gemini-flash-latest">Gemini Flash Latest (Bản mới nhất tự động cập nhật)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-glass" id="btn-verify-key"><i class="fa-solid fa-vial-circle-check"></i> Kiểm Tra Key</button>
+                <button class="btn btn-glass" id="btn-cancel-settings">Đóng</button>
+                <button class="btn btn-primary" id="btn-save-settings">Lưu Cài Đặt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <i class="fa-solid fa-circle-info" id="toast-icon"></i>
+        <span id="toast-message">Thông báo</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
