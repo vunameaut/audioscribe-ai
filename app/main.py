@@ -66,6 +66,13 @@ class RenameSpeakerRequest(BaseModel):
     old_name: str
     new_name: str
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    fav_path = STATIC_DIR / "favicon.svg"
+    if fav_path.exists():
+        return FileResponse(path=str(fav_path), media_type="image/svg+xml")
+    return HTMLResponse("")
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_file = STATIC_DIR / "index.html"
