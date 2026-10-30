@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import UPLOAD_DIR, STATIC_DIR, DEFAULT_GEMINI_MODEL, DEFAULT_WHISPER_MODEL
-from .audio_utils import get_audio_metadata, optimize_audio_for_gemini
+from .audio_utils import get_audio_metadata, optimize_audio_for_gemini, extract_audio_from_media, is_video_file
 from .gemini_transcriber import GeminiTranscriber
 from .local_transcriber import LocalTranscriber
 from .export_service import ExportService
@@ -121,7 +121,7 @@ async def upload_audio(file: UploadFile = File(...)):
     job_dir = get_job_dir(job_id)
 
     # Save uploaded file
-    file_ext = Path(file.filename or "audio.mp3").suffix or ".mp3"
+    file_ext = Path(file.filename or "media.mp3").suffix or ".mp3"
     saved_path = job_dir / f"original{file_ext}"
 
     with open(saved_path, "wb") as buffer:
@@ -130,14 +130,34 @@ async def upload_audio(file: UploadFile = File(...)):
     # Extract metadata using ffprobe
     metadata = get_audio_metadata(saved_path)
 
+    # If it is a video file, extract audio for fast transcription & universal playback
+    is_video = metadata.get("is_video", False) or is_video_file(saved_path)
+    if is_video:
+        try:
+            extracted_audio_path = job_dir / "extracted_audio.mp3"
+            extract_audio_from_media(saved_path, extracted_audio_path)
+            audio_path = extracted_audio_path
+            message = "Đã nhận diện file Video và trích xuất luồng âm thanh tối ưu thành công!"
+        except Exception as e:
+            # Fallback to original if audio extraction fails
+            print(f"[Upload] Warning: Audio extraction failed: {e}")
+            audio_path = saved_path
+            message = "Đã nhận diện file Video và sẵn sàng xử lý"
+    else:
+        audio_path = saved_path
+        message = "File âm thanh đã sẵn sàng xử lý"
+
     JOBS[job_id] = {
         "job_id": job_id,
         "filename": file.filename,
-        "audio_path": str(saved_path),
+        "media_path": str(saved_path),
+        "audio_path": str(audio_path),
+        "video_path": str(saved_path) if is_video else "",
+        "is_video": is_video,
         "metadata": metadata,
         "status": "uploaded",
         "progress": 0,
-        "message": "File đã sẵn sàng xử lý",
+        "message": message,
         "result": None
     }
     save_job_state(job_id)
@@ -145,6 +165,7 @@ async def upload_audio(file: UploadFile = File(...)):
     return {
         "job_id": job_id,
         "filename": file.filename,
+        "is_video": is_video,
         "metadata": metadata
     }
 
@@ -264,13 +285,41 @@ async def stream_audio(job_id: str):
     if not audio_path.exists():
         raise HTTPException(status_code=404, detail="File âm thanh không tồn tại trên máy chủ.")
 
-    mime_type = "audio/mpeg"
-    if audio_path.suffix.lower() == ".wav":
-        mime_type = "audio/wav"
-    elif audio_path.suffix.lower() == ".m4a":
-        mime_type = "audio/mp4"
+    mime_map = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".webm": "audio/webm",
+        ".opus": "audio/opus"
+    }
+    mime_type = mime_map.get(audio_path.suffix.lower(), "audio/mpeg")
 
     return FileResponse(path=str(audio_path), media_type=mime_type)
+
+@app.get("/api/video/{job_id}")
+async def stream_video(job_id: str):
+    job = JOBS.get(job_id) or load_job_state(job_id)
+    if not job or not job.get("video_path"):
+        raise HTTPException(status_code=404, detail="Không tìm thấy video.")
+    video_path = Path(job["video_path"])
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="File video không tồn tại trên máy chủ.")
+
+    mime_map = {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".mkv": "video/x-matroska",
+        ".avi": "video/x-msvideo",
+        ".m4v": "video/mp4",
+        ".flv": "video/x-flv"
+    }
+    mime_type = mime_map.get(video_path.suffix.lower(), "video/mp4")
+
+    return FileResponse(path=str(video_path), media_type=mime_type)
 
 @app.post("/api/rename-speaker")
 async def rename_speaker(req: RenameSpeakerRequest):
@@ -304,6 +353,16 @@ async def rename_speaker(req: RenameSpeakerRequest):
     for act in result.get("summary", {}).get("action_items", []):
         if act.get("assignee") == old_name:
             act["assignee"] = new_name
+
+    # Update full_transcript_text
+    lines = []
+    for seg in result.get("transcript", []):
+        spk = seg.get("speaker", "Người nói")
+        start = seg.get("start", "00:00")
+        end = seg.get("end", "")
+        t_str = f"[{start} - {end}]" if end else f"[{start}]"
+        lines.append(f"{t_str} {spk}:\n{seg.get('text', '')}")
+    result["full_transcript_text"] = "\n\n".join(lines)
 
     save_job_state(req.job_id)
     return {"status": "success", "result": result}
@@ -354,6 +413,11 @@ async def export_job(job_id: str, format_type: str):
         out_file = jdir / f"{clean_title}.txt"
         ExportService.export_to_txt(job["result"], out_file)
         return FileResponse(path=str(out_file), filename=f"{clean_title}.txt", media_type="text/plain")
+
+    elif format_type == "full_txt":
+        out_file = jdir / f"{clean_title}_toan_van.txt"
+        ExportService.export_to_full_txt(job["result"], out_file)
+        return FileResponse(path=str(out_file), filename=f"{clean_title}_toan_van.txt", media_type="text/plain; charset=utf-8")
 
     elif format_type == "srt":
         out_file = jdir / f"{clean_title}.srt"

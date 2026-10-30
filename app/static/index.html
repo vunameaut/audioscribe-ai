@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AudioScribe AI - Chuyển Âm Thanh & Tóm Tắt Đa Người Nói</title>
+    <title>AudioScribe AI - Chuyển Âm Thanh & Video Thành Văn Bản, Tóm Tắt Đa Người Nói</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
                 </div>
                 <div class="brand-text">
                     <h1>AudioScribe <span class="gradient-text">AI</span></h1>
-                    <span class="sub-tag">Nhận diện đa người nói & Tóm tắt cuộc họp thông minh</span>
+                    <span class="sub-tag">Nhận diện đa người nói & Tóm tắt âm thanh, video thông minh</span>
                 </div>
             </div>
 
@@ -54,20 +54,20 @@
                 <div class="card-header">
                     <div class="header-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
                     <div class="header-titles">
-                        <h2>Tải Lên File Âm Thanh Cuộc Trò Chuyện</h2>
-                        <p>Hỗ trợ file ghi âm dài hơn 1 giờ (MP3, M4A, WAV, AAC, MP4, WebM). AI tự động nhận diện từng người nói và trích xuất điểm cốt lõi.</p>
+                        <h2>Tải Lên File Âm Thanh hoặc Video Cuộc Trò Chuyện</h2>
+                        <p>Hỗ trợ file âm thanh & video dài (MP3, WAV, M4A, AAC, MP4, MKV, MOV, AVI, WebM, FLV...). AI tự động nhận diện từng người nói, gỡ băng nguyên văn toàn bộ và trích xuất điểm cốt lõi.</p>
                     </div>
                 </div>
 
                 <!-- Dropzone -->
                 <div id="dropzone" class="dropzone">
-                    <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm" hidden>
+                    <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.wma,.opus,.mp4,.mkv,.mov,.avi,.webm,.flv,.wmv,.m4v,.ts,.3gp" hidden>
                     <div class="dropzone-content">
                         <div class="upload-icon-wrapper">
-                            <i class="fa-solid fa-file-audio"></i>
+                            <i class="fa-solid fa-photo-film"></i>
                         </div>
-                        <h3>Kéo thả file âm thanh vào đây hoặc <span class="highlight-link">Chọn file từ máy tính</span></h3>
-                        <p class="dropzone-hint">Hỗ trợ MP3, M4A, WAV, AAC... Tối ưu cho file dài nhiều người nói</p>
+                        <h3>Kéo thả file âm thanh hoặc video vào đây hoặc <span class="highlight-link">Chọn file từ máy tính</span></h3>
+                        <p class="dropzone-hint">Hỗ trợ MP3, WAV, M4A, AAC, MP4, MKV, MOV, AVI, WebM... Tối ưu cho file dài nhiều người nói</p>
                     </div>
 
                     <!-- File Info Card (Hidden initially) -->
@@ -77,6 +77,7 @@
                             <div class="meta-texts">
                                 <span id="file-name" class="name">meeting_recording.mp3</span>
                                 <div class="sub-badges">
+                                    <span id="file-media-type" class="pill-info"><i class="fa-solid fa-file-audio"></i> Âm thanh</span>
                                     <span id="file-size" class="pill-info">65.4 MB</span>
                                     <span id="file-duration" class="pill-info">01:14:32</span>
                                     <span id="file-format" class="pill-info">MP3 • 44.1kHz</span>
@@ -89,9 +90,13 @@
                     </div>
                 </div>
 
-                <!-- Audio Scrubber Preview (If file loaded) -->
+                <!-- Media Preview (Audio or Video) -->
                 <div id="audio-preview-container" class="audio-preview-strip hidden">
                     <audio id="audio-preview-player" controls preload="metadata"></audio>
+                </div>
+                <div id="video-preview-container" class="video-preview-strip hidden">
+                    <div class="video-preview-header"><i class="fa-solid fa-video"></i> Xem trước video:</div>
+                    <video id="video-preview-player" controls preload="metadata"></video>
                 </div>
 
                 <!-- Processing Mode Selection -->
@@ -212,6 +217,7 @@
                             <span class="meta-chip"><i class="fa-regular fa-clock"></i> <span id="res-duration">--:--</span></span>
                             <span class="meta-chip"><i class="fa-solid fa-users"></i> <span id="res-speakers-count">0 người nói</span></span>
                             <span class="meta-chip"><i class="fa-solid fa-comments"></i> <span id="res-turns-count">0 lượt phát biểu</span></span>
+                            <span class="meta-chip"><i class="fa-solid fa-pen-nib"></i> <span id="res-words-count">0 từ</span></span>
                         </div>
                     </div>
 
@@ -228,7 +234,14 @@
                                     <i class="fa-solid fa-file-word text-blue"></i>
                                     <div>
                                         <strong>Microsoft Word (.docx)</strong>
-                                        <small>Bản in chuyên nghiệp, bảng việc, màu người nói</small>
+                                        <small>Bản in chuyên nghiệp, bảng việc, toàn văn gỡ băng</small>
+                                    </div>
+                                </a>
+                                <a href="#" class="dropdown-item" data-export="full_txt">
+                                    <i class="fa-solid fa-file-signature text-emerald"></i>
+                                    <div>
+                                        <strong>Bản Ghi Chép Lời Toàn Bộ (.txt)</strong>
+                                        <small>Chỉ xuất toàn bộ văn bản lời thoại nguyên văn</small>
                                     </div>
                                 </a>
                                 <a href="#" class="dropdown-item" data-export="md">
@@ -241,19 +254,19 @@
                                 <a href="#" class="dropdown-item" data-export="txt">
                                     <i class="fa-solid fa-file-lines text-slate"></i>
                                     <div>
-                                        <strong>Văn bản thô (.txt)</strong>
-                                        <small>File text nhẹ, mở trên mọi thiết bị</small>
+                                        <strong>Văn bản tổng hợp (.txt)</strong>
+                                        <small>Kèm tóm tắt, quyết định & lời thoại</small>
                                     </div>
                                 </a>
                                 <a href="#" class="dropdown-item" data-export="srt">
-                                    <i class="fa-solid fa-closed-captioning text-emerald"></i>
+                                    <i class="fa-solid fa-closed-captioning text-amber"></i>
                                     <div>
                                         <strong>Phụ đề Subtitle (.srt)</strong>
                                         <small>Phụ đề Premiere, CapCut, DaVinci</small>
                                     </div>
                                 </a>
                                 <a href="#" class="dropdown-item" data-export="json">
-                                    <i class="fa-solid fa-code text-amber"></i>
+                                    <i class="fa-solid fa-code text-violet"></i>
                                     <div>
                                         <strong>Dữ liệu JSON (.json)</strong>
                                         <small>Dữ liệu cấu trúc gốc kèm mốc thời gian</small>
@@ -266,6 +279,19 @@
                             <i class="fa-solid fa-arrow-rotate-right"></i>
                             <span>Làm mới</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Synchronized Video Player (Visible for video files) -->
+                <div id="result-video-box" class="result-video-container hidden">
+                    <div class="result-video-header">
+                        <span class="video-status-tag"><i class="fa-solid fa-video"></i> Video cuộc họp (Tự động đồng bộ theo từng câu thoại)</span>
+                        <div class="video-actions">
+                            <button id="btn-toggle-video" class="btn-icon" title="Ẩn/Hiện Video"><i class="fa-solid fa-angle-up"></i></button>
+                        </div>
+                    </div>
+                    <div id="video-wrapper" class="video-wrapper">
+                        <video id="main-video-player" controls preload="auto"></video>
                     </div>
                 </div>
 
@@ -307,7 +333,7 @@
                     </button>
                     <button class="tab-btn" data-tab="tab-transcript">
                         <i class="fa-solid fa-microphone-lines"></i>
-                        <span>2. Bản Gỡ Băng Lời Thoại</span>
+                        <span>2. Bản Ghi Chép Lời Toàn Bộ</span>
                         <span id="tab-transcript-count" class="badge-count">0</span>
                     </button>
                     <button class="tab-btn" data-tab="tab-chat">
@@ -372,27 +398,75 @@
                     </div>
                 </div>
 
-                <!-- Tab 2: Full Transcript -->
+                <!-- Tab 2: Full Transcript & Verbatim Reading Mode -->
                 <div id="tab-transcript" class="tab-pane">
-                    <!-- Toolbar: Search & Filter -->
-                    <div class="transcript-toolbar">
-                        <div class="search-box">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="transcript-search" placeholder="Tìm kiếm từ khóa trong cuộc trò chuyện...">
-                            <button id="btn-clear-search" class="btn-clear hidden"><i class="fa-solid fa-xmark"></i></button>
+                    <!-- Subview Switcher & Actions Bar -->
+                    <div class="transcript-subnav-bar">
+                        <div class="view-switch-group">
+                            <button id="btn-view-timeline" class="subview-btn active" data-subview="timeline">
+                                <i class="fa-solid fa-list-ol"></i>
+                                <span>Dạng Phân Đoạn & Mốc Thời Gian</span>
+                            </button>
+                            <button id="btn-view-fulltext" class="subview-btn" data-subview="fulltext">
+                                <i class="fa-solid fa-align-left"></i>
+                                <span>Toàn Văn Bản Ghi Chép Liền Mạch</span>
+                            </button>
                         </div>
 
-                        <div class="speaker-filter-cluster">
-                            <span class="filter-label">Lọc theo người:</span>
-                            <div id="speaker-filter-pills" class="filter-pills">
-                                <button class="pill active" data-speaker="all">Tất cả</button>
-                            </div>
+                        <div class="transcript-actions-group">
+                            <button id="btn-copy-fulltext" class="btn btn-glass btn-sm" title="Sao chép toàn bộ văn bản ghi chép">
+                                <i class="fa-regular fa-copy"></i>
+                                <span>Sao chép toàn bộ</span>
+                            </button>
+                            <a href="#" id="btn-download-fulltext" class="btn btn-glass btn-sm" title="Tải file text toàn bộ">
+                                <i class="fa-solid fa-download"></i>
+                                <span>Tải bản toàn bộ (.txt)</span>
+                            </a>
                         </div>
                     </div>
 
-                    <!-- Transcript Feed -->
-                    <div id="transcript-feed" class="transcript-feed">
-                        <!-- Segments rendered here -->
+                    <!-- Subview 1: Timeline Segments View -->
+                    <div id="timeline-view-wrapper" class="subview-pane active">
+                        <!-- Toolbar: Search & Filter -->
+                        <div class="transcript-toolbar">
+                            <div class="search-box">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="transcript-search" placeholder="Tìm kiếm từ khóa trong cuộc trò chuyện...">
+                                <button id="btn-clear-search" class="btn-clear hidden"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+
+                            <div class="speaker-filter-cluster">
+                                <span class="filter-label">Lọc theo người:</span>
+                                <div id="speaker-filter-pills" class="filter-pills">
+                                    <button class="pill active" data-speaker="all">Tất cả</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transcript Feed -->
+                        <div id="transcript-feed" class="transcript-feed">
+                            <!-- Segments rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Subview 2: Full Continuous Verbatim Text View -->
+                    <div id="fulltext-view-wrapper" class="subview-pane hidden">
+                        <div class="fulltext-document-card">
+                            <div class="fulltext-doc-header">
+                                <div class="doc-title-info">
+                                    <h4 id="fulltext-doc-title">Bản Ghi Chép Lời Toàn Bộ (Verbatim)</h4>
+                                    <span id="fulltext-doc-meta" class="doc-meta-badge">0 lượt phát biểu • 0 từ</span>
+                                </div>
+                                <div class="doc-header-actions">
+                                    <button id="btn-copy-doc-text" class="btn btn-glass btn-sm">
+                                        <i class="fa-regular fa-copy"></i> Sao chép văn bản
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="fulltext-doc-content" class="fulltext-doc-body">
+                                <!-- Continuous text paragraphs rendered here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 

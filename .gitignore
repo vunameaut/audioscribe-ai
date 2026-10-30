@@ -15,6 +15,12 @@ uploads/*
 *.flac
 *.mp4
 *.webm
+*.mkv
+*.mov
+*.avi
+*.flv
+*.wmv
+*.m4v
 
 # Environment variables & secrets
 .env

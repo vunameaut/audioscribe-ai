@@ -116,10 +116,20 @@ class LocalTranscriber:
         # Generate rule-based summary and key points
         summary = self._generate_extractive_summary(raw_segments, meeting_context)
 
+        # Build full continuous verbatim transcript text
+        full_transcript_lines = []
+        for seg in raw_segments:
+            full_transcript_lines.append(f"[{seg['start']} - {seg['end']}] {seg['speaker']}:\n{seg['text']}")
+        full_transcript_text = "\n\n".join(full_transcript_lines)
+
+        total_words = sum(len(seg["text"].split()) for seg in raw_segments)
+
         return {
             "summary": summary,
             "speakers": speaker_objects,
-            "transcript": raw_segments
+            "transcript": raw_segments,
+            "full_transcript_text": full_transcript_text,
+            "word_count": total_words
         }
 
     def _generate_extractive_summary(self, segments: List[Dict[str, Any]], context: Optional[str] = None) -> Dict[str, Any]:

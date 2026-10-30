@@ -103,8 +103,13 @@ class ExportService:
                     st_p = doc.add_paragraph(style='List Bullet 2')
                     st_p.add_run(st)
 
-        # 5. BẢN GỠ BĂNG CHI TIẾT
-        doc.add_heading("5. BẢN GỠ BĂNG LỜI THOẠI ĐẦY ĐỦ", level=1)
+        # 5. BẢN GHI CHÉP LỜI TOÀN BỘ
+        doc.add_heading("5. BẢN GHI CHÉP LỜI TOÀN BỘ (VERBATIM TRANSCRIPT)", level=1)
+        sub_info = doc.add_paragraph(f"Tổng cộng: {len(transcript)} lượt phát biểu • {data.get('word_count', len((' '.join(t.get('text', '') for t in transcript)).split()))} từ")
+        sub_info.runs[0].font.italic = True
+        sub_info.runs[0].font.color.rgb = RGBColor(0x64, 0x74, 0x8b)
+        sub_info.runs[0].font.size = Pt(10)
+
         for item in transcript:
             speaker = item.get("speaker", "Người nói")
             start = item.get("start", "00:00:00")
@@ -189,12 +194,33 @@ class ExportService:
                 lines.append(f"- {d}")
             lines.append("")
 
-        lines.append("CHI TIẾT LỜI THOẠI:")
-        lines.append("-" * 50)
+        lines.append(f"BẢN GHI CHÉP LỜI TOÀN BỘ ({len(transcript)} lượt phát biểu):")
+        lines.append("=" * 60)
         for item in transcript:
-            lines.append(f"[{item.get('start')} - {item.get('end')}] {item.get('speaker')}: {item.get('text')}")
+            lines.append(f"[{item.get('start')} - {item.get('end')}] {item.get('speaker')}:\n{item.get('text')}\n")
 
         output_path.write_text("\n".join(lines), encoding="utf-8")
+        return output_path
+
+    @staticmethod
+    def export_to_full_txt(data: Dict[str, Any], output_path: Path):
+        """Export pure full transcript text only, without executive summary blocks."""
+        summary = data.get("summary", {})
+        transcript = data.get("transcript", [])
+        full_text = data.get("full_transcript_text", "")
+
+        if full_text:
+            content = f"=== BẢN GHI CHÉP LỜI TOÀN BỘ: {summary.get('title', '')} ===\n\n{full_text}"
+        else:
+            lines = [f"=== BẢN GHI CHÉP LỜI TOÀN BỘ: {summary.get('title', '')} ===\n"]
+            for item in transcript:
+                start = item.get("start", "00:00")
+                end = item.get("end", "")
+                t_str = f"[{start} - {end}]" if end else f"[{start}]"
+                lines.append(f"{t_str} {item.get('speaker', 'Người nói')}:\n{item.get('text', '')}\n")
+            content = "\n".join(lines)
+
+        output_path.write_text(content, encoding="utf-8")
         return output_path
 
     @staticmethod

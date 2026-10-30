@@ -47,19 +47,21 @@ class GeminiTranscriber:
         speaker_hints: Optional[str],
         meeting_context: Optional[str]
     ) -> str:
-        prompt = """Bạn là một chuyên gia gỡ băng âm thanh và thư ký cuộc họp chuyên nghiệp cấp cao.
-Đây là file âm thanh ghi âm cuộc trò chuyện/cuộc thảo luận bằng tiếng Việt có thời lượng dài và có sự tham gia của NHIỀU NGƯỜI NÓI (MULTI-SPEAKER).
+        prompt = """Bạn là một chuyên gia gỡ băng âm thanh/video và thư ký cuộc họp chuyên nghiệp cấp cao.
+Đây là file âm thanh/video ghi lại cuộc trao đổi, thảo luận hoặc cuộc họp bằng tiếng Việt (có thể có nhiều người nói).
 
 NHIỆM VỤ QUAN TRỌNG NHẤT CỦA BẠN:
-1. NHẬN DIỆN VÀ TÁCH BIỆT HẾT TẤT CẢ NGƯỜI NÓI (SPEAKER DIARIZATION):
-   - Lắng nghe kỹ đặc trưng giọng nói, cao độ, ngữ điệu và lượt phát biểu để phân biệt chính xác từng người tham gia.
-   - Đặt tên nhất quán từ đầu đến cuối: "Người nói 1", "Người nói 2", "Người nói 3",... HOẶC nếu trong âm thanh họ có xưng hô tên cụ thể (hoặc theo danh sách gợi ý dưới đây), hãy dùng tên thật của họ kèm vai trò.
-   - Không được bỏ sót người nói nào dù họ chỉ phát biểu ngắn.
-   - Tuyệt đối không gộp câu thoại của hai người nói khác nhau vào chung một lượt.
-   - Mỗi lượt thoại (transcript segment) PHẢI có mốc thời gian bắt đầu và kết thúc chính xác dạng HH:MM:SS (hoặc MM:SS).
 
-2. TỔNG HỢP VÀ TÓM TẮT ĐỂ NẮM BẮT NHANH TOÀN BỘ NỘI DUNG:
-   - Viết phần TỔNG QUAN súc tích, mạch lạc (Bối cảnh, mục đích cuộc gặp).
+1. BẢN GHI CHÉP LỜI TOÀN BỘ NGUYÊN VĂN 100% (FULL VERBATIM TRANSCRIPT):
+   - Bạn PHẢI gỡ băng NGUYÊN VĂN TOÀN BỘ từng câu từng chữ từ đầu đến cuối file mà không được bỏ sót, không nhảy cóc.
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC TÓM TẮT, KHÔNG CẮT BỚT NỘI DUNG LỜI THOẠI. Giữ nguyên vẹn toàn bộ các câu trao đổi, tranh luận, giải thích.
+   - Phân biệt chính xác từng người nói (Speaker Diarization). Đặt tên nhất quán: "Người nói 1", "Người nói 2",... hoặc tên cụ thể nếu có xưng hô.
+   - Mỗi lượt thoại (transcript segment) PHẢI có mốc thời gian bắt đầu và kết thúc chính xác dạng HH:MM:SS (hoặc MM:SS).
+   - Tuyệt đối không gộp lời thoại của hai người khác nhau vào cùng một lượt.
+   - Cung cấp thêm chuỗi `full_transcript_text`: toàn bộ bản gỡ băng đầy đủ liên tục theo định dạng văn bản đọc liền mạch, mỗi lượt nói xuống dòng rõ ràng kèm mốc thời gian và tên người phát biểu.
+
+2. TỔNG HỢP VÀ TÓM TẮT ĐIỀU HÀNH ĐỂ NẮM BẮT NHANH TOÀN BỘ NỘI DUNG:
+   - Viết phần TỔNG QUAN súc tích, mạch lạc (Bối cảnh, mục đích cuộc gặp, kết quả chung).
    - Liệt kê CHI TIẾT CÁC Ý CHÍNH theo từng chủ đề thảo luận.
    - TỔNG HỢP QUAN ĐIỂM & ĐÓNG GÓP của từng người nói (Người A muốn gì, Người B phản biện ra sao).
    - Danh sách CÁC QUYẾT ĐỊNH / ĐIỂM THỐNG NHẤT quan trọng.
@@ -123,9 +125,10 @@ BẮT BUỘC chỉ trả về duy nhất một chuỗi JSON hợp lệ (không k
       "speaker": "Người nói 1",
       "start": "00:00:03",
       "end": "00:00:25",
-      "text": "Lời phát biểu chính xác..."
+      "text": "Lời phát biểu chính xác đầy đủ..."
     }
-  ]
+  ],
+  "full_transcript_text": "[00:00:03] Người nói 1: Lời phát biểu đầy đủ nguyên văn...\\n\\n[00:00:26] Người nói 2: Lời phát biểu đầy đủ..."
 }
 """
         return prompt
@@ -313,6 +316,26 @@ BẮT BUỘC chỉ trả về duy nhất một chuỗi JSON hợp lệ (không k
                 speakers.append(speaker_obj)
 
         data["speakers"] = speakers
+
+        # Build / normalize full_transcript_text
+        full_transcript_text = data.get("full_transcript_text", "").strip()
+        if not full_transcript_text and transcript:
+            lines = []
+            for item in transcript:
+                spk = item.get("speaker", "Người nói")
+                start = item.get("start", "00:00")
+                end = item.get("end", "")
+                time_tag = f"[{start} - {end}]" if end else f"[{start}]"
+                text = item.get("text", "").strip()
+                lines.append(f"{time_tag} {spk}:\n{text}")
+            full_transcript_text = "\n\n".join(lines)
+
+        data["full_transcript_text"] = full_transcript_text
+
+        # Compute word count
+        total_words = sum(len(item.get("text", "").split()) for item in transcript)
+        data["word_count"] = total_words
+
         return data
 
     def ask_chat(self, transcript_text: str, summary_data: Dict[str, Any], question: str) -> str:

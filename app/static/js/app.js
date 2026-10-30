@@ -31,9 +31,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileSizeEl = document.getElementById("file-size");
     const fileDurationEl = document.getElementById("file-duration");
     const fileFormatEl = document.getElementById("file-format");
+    const fileMediaType = document.getElementById("file-media-type");
     const btnRemoveFile = document.getElementById("btn-remove-file");
     const audioPreviewContainer = document.getElementById("audio-preview-container");
     const audioPreviewPlayer = document.getElementById("audio-preview-player");
+    const videoPreviewContainer = document.getElementById("video-preview-container");
+    const videoPreviewPlayer = document.getElementById("video-preview-player");
     const modeCards = document.querySelectorAll(".mode-card");
     const inputSpeakersCount = document.getElementById("input-speakers-count");
     const inputSpeakerHints = document.getElementById("input-speaker-hints");
@@ -59,7 +62,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const resDuration = document.getElementById("res-duration");
     const resSpeakersCount = document.getElementById("res-speakers-count");
     const resTurnsCount = document.getElementById("res-turns-count");
+    const resWordsCount = document.getElementById("res-words-count");
     const btnRestart = document.getElementById("btn-restart");
+
+    // Video Player Box in Results
+    const resultVideoBox = document.getElementById("result-video-box");
+    const mainVideoPlayer = document.getElementById("main-video-player");
+    const btnToggleVideo = document.getElementById("btn-toggle-video");
+    const videoWrapper = document.getElementById("video-wrapper");
 
     // Audio Player Bar
     const mainAudioPlayer = document.getElementById("main-audio-player");
@@ -85,11 +95,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const sumSpeakersViewpoints = document.getElementById("sum-speakers-viewpoints");
     const sumTopicsContainer = document.getElementById("sum-topics-container");
 
-    // Tab 2 Elements
+    // Tab 2 Subviews & Elements
+    const btnViewTimeline = document.getElementById("btn-view-timeline");
+    const btnViewFulltext = document.getElementById("btn-view-fulltext");
+    const timelineViewWrapper = document.getElementById("timeline-view-wrapper");
+    const fulltextViewWrapper = document.getElementById("fulltext-view-wrapper");
     const transcriptSearch = document.getElementById("transcript-search");
     const btnClearSearch = document.getElementById("btn-clear-search");
     const speakerFilterPills = document.getElementById("speaker-filter-pills");
     const transcriptFeed = document.getElementById("transcript-feed");
+    const fulltextDocTitle = document.getElementById("fulltext-doc-title");
+    const fulltextDocMeta = document.getElementById("fulltext-doc-meta");
+    const fulltextDocContent = document.getElementById("fulltext-doc-content");
+    const btnCopyFulltext = document.getElementById("btn-copy-fulltext");
+    const btnCopyDocText = document.getElementById("btn-copy-doc-text");
+    const btnDownloadFulltext = document.getElementById("btn-download-fulltext");
 
     // Tab 3 Elements
     const chatMessages = document.getElementById("chat-messages");
@@ -271,11 +291,16 @@ document.addEventListener("DOMContentLoaded", () => {
         audioPreviewContainer.classList.add("hidden");
         audioPreviewPlayer.pause();
         audioPreviewPlayer.src = "";
+        if (videoPreviewContainer) videoPreviewContainer.classList.add("hidden");
+        if (videoPreviewPlayer) {
+            videoPreviewPlayer.pause();
+            videoPreviewPlayer.src = "";
+        }
         btnStartProcess.disabled = true;
     }
 
     async function handleFileUpload(file) {
-        showToast("Đang tải file âm thanh lên hệ thống...", "info");
+        showToast("Đang tải file lên hệ thống...", "info");
         btnStartProcess.disabled = true;
 
         const formData = new FormData();
@@ -294,19 +319,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await res.json();
             currentJobId = data.job_id;
-            const meta = data.metadata;
+            const meta = data.metadata || {};
+            const isVideo = Boolean(data.is_video || meta.is_video);
 
             // Render file info preview
             dropzone.querySelector(".dropzone-content").classList.add("hidden");
             fileInfoPreview.classList.remove("hidden");
             fileNameEl.textContent = data.filename;
             fileSizeEl.textContent = `${meta.size_mb} MB`;
-            fileDurationEl.textContent = meta.duration_formatted;
-            fileFormatEl.textContent = `${meta.format_name.toUpperCase()} • ${meta.channels}ch`;
+            fileDurationEl.textContent = meta.duration_formatted || "00:00:00";
+            fileFormatEl.textContent = `${(meta.format_name || "MEDIA").toUpperCase()} • ${meta.channels || 2}ch`;
 
-            // Load preview audio
-            audioPreviewPlayer.src = `/api/audio/${currentJobId}`;
-            audioPreviewContainer.classList.remove("hidden");
+            if (fileMediaType) {
+                if (isVideo) {
+                    const resStr = meta.video_info?.resolution ? ` • ${meta.video_info.resolution}` : "";
+                    fileMediaType.innerHTML = `<i class="fa-solid fa-video"></i> Video${resStr}`;
+                    fileMediaType.className = "pill-info pill-media-video";
+                } else {
+                    fileMediaType.innerHTML = `<i class="fa-solid fa-file-audio"></i> Âm thanh`;
+                    fileMediaType.className = "pill-info pill-media-audio";
+                }
+            }
+
+            // Preview player setup
+            const ext = (data.filename || "").split(".").pop().toLowerCase();
+            const canPlayVideoBrowser = ["mp4", "webm"].includes(ext);
+
+            if (isVideo && canPlayVideoBrowser && videoPreviewPlayer && videoPreviewContainer) {
+                videoPreviewPlayer.src = `/api/video/${currentJobId}`;
+                videoPreviewContainer.classList.remove("hidden");
+                audioPreviewContainer.classList.add("hidden");
+            } else {
+                audioPreviewPlayer.src = `/api/audio/${currentJobId}`;
+                audioPreviewContainer.classList.remove("hidden");
+                if (videoPreviewContainer) videoPreviewContainer.classList.add("hidden");
+            }
 
             btnStartProcess.disabled = false;
             showToast("Tải file thành công! Bạn có thể bắt đầu xử lý.", "success");
@@ -464,6 +511,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------------------------------------------
     // RESULTS RENDERING
     // ----------------------------------------------------
+    let isVideoActive = false;
+
     function renderResults(job) {
         progressSection.classList.add("hidden");
         resultsSection.classList.remove("hidden");
@@ -481,6 +530,26 @@ document.addEventListener("DOMContentLoaded", () => {
         resTurnsCount.textContent = `${transcript.length} lượt đối thoại`;
         tabTranscriptCount.textContent = transcript.length;
 
+        const totalWords = res.word_count || transcript.reduce((acc, t) => acc + (t.text || "").split(/\s+/).filter(Boolean).length, 0);
+        if (resWordsCount) resWordsCount.textContent = `${totalWords.toLocaleString()} từ`;
+
+        // Check video capability
+        const ext = (job.filename || "").split(".").pop().toLowerCase();
+        const canPlayVideoDirectly = ["mp4", "webm"].includes(ext);
+        isVideoActive = Boolean(job.is_video && canPlayVideoDirectly);
+
+        if (isVideoActive && resultVideoBox && mainVideoPlayer) {
+            resultVideoBox.classList.remove("hidden");
+            mainVideoPlayer.src = `/api/video/${job.job_id}`;
+            setupVideoPlayer();
+        } else {
+            if (resultVideoBox) resultVideoBox.classList.add("hidden");
+            if (mainVideoPlayer) {
+                mainVideoPlayer.pause();
+                mainVideoPlayer.src = "";
+            }
+        }
+
         // Initialize Audio Player
         mainAudioPlayer.src = `/api/audio/${job.job_id}`;
         setupAudioPlayer();
@@ -488,15 +557,16 @@ document.addEventListener("DOMContentLoaded", () => {
         // 1. Tab Summary
         renderSummaryTab(summary, speakers);
 
-        // 2. Tab Transcript
+        // 2. Tab Transcript (Timeline and Full Document)
         renderSpeakerFilters(speakers);
         renderTranscriptList(transcript);
+        renderFulltextDoc(job);
 
         // 3. Tab Chat Reset
         chatMessages.innerHTML = "";
-        appendChatMessage("ai", `Xin chào! Tôi đã nắm trọn vẹn nội dung cuộc họp "${summary.title}". Bạn có thể hỏi tôi bất kỳ điều gì, từ tóm tắt chi tiết, việc cần làm, hoặc ai đã phát biểu vấn đề gì!`);
+        appendChatMessage("ai", `Xin chào! Tôi đã nắm trọn vẹn nội dung "${summary.title}". Bạn có thể hỏi tôi bất kỳ điều gì, từ chi tiết bản ghi lời, việc cần làm, hoặc ai đã phát biểu quan điểm gì!`);
 
-        showToast("Đã hoàn tất nhận diện và tóm tắt xuất sắc!", "success");
+        showToast("Đã hoàn tất nhận diện và tóm tắt thành công!", "success");
     }
 
     function renderSummaryTab(summary, speakers) {
@@ -655,12 +725,12 @@ document.addEventListener("DOMContentLoaded", () => {
             // Click timestamp to seek & play
             div.querySelector(".time-stamp-btn").addEventListener("click", (e) => {
                 e.stopPropagation();
-                seekAudioTo(seg.start);
+                seekMediaTo(seg.start);
             });
 
             // Click entire segment row to seek
             div.addEventListener("click", () => {
-                seekAudioTo(seg.start);
+                seekMediaTo(seg.start);
             });
 
             // Click speaker name to rename
@@ -762,6 +832,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderSummaryTab(jobData.summary, jobData.speakers);
             renderSpeakerFilters(jobData.speakers);
             renderTranscriptList(jobData.transcript);
+            renderFulltextDoc({ job_id: currentJobId, result: jobData });
 
         } catch (e) {
             showToast(e.message, "error");
@@ -769,27 +840,168 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ----------------------------------------------------
-    // SYNCHRONIZED AUDIO PLAYER
+    // TAB 2: FULLTEXT DOCUMENT VIEW & SUBVIEWS
     // ----------------------------------------------------
+    btnViewTimeline?.addEventListener("click", () => {
+        btnViewTimeline.classList.add("active");
+        btnViewFulltext.classList.remove("active");
+        timelineViewWrapper.classList.remove("hidden");
+        fulltextViewWrapper.classList.add("hidden");
+    });
+
+    btnViewFulltext?.addEventListener("click", () => {
+        btnViewFulltext.classList.add("active");
+        btnViewTimeline.classList.remove("active");
+        fulltextViewWrapper.classList.remove("hidden");
+        timelineViewWrapper.classList.add("hidden");
+    });
+
+    function renderFulltextDoc(job) {
+        if (!job || !job.result) return;
+        const res = job.result;
+        const transcript = res.transcript || [];
+        const speakers = res.speakers || [];
+        const summary = res.summary || {};
+        const wordCount = res.word_count || transcript.reduce((acc, t) => acc + (t.text || "").split(/\s+/).filter(Boolean).length, 0);
+
+        if (fulltextDocTitle) {
+            fulltextDocTitle.textContent = `Bản Ghi Chép Lời Toàn Bộ (Verbatim): ${summary.title || "Cuộc trò chuyện"}`;
+        }
+        if (fulltextDocMeta) {
+            fulltextDocMeta.textContent = `${transcript.length} lượt phát biểu • ${wordCount.toLocaleString()} từ`;
+        }
+        if (btnDownloadFulltext) {
+            btnDownloadFulltext.href = `/api/export/${job.job_id}/full_txt`;
+        }
+
+        if (!fulltextDocContent) return;
+        fulltextDocContent.innerHTML = "";
+
+        transcript.forEach((seg) => {
+            const spkObj = speakers.find(s => s.name === seg.speaker) || {};
+            const color = spkObj.color || "#6366f1";
+            const initial = (seg.speaker || "N")[0].toUpperCase();
+
+            const turnDiv = document.createElement("div");
+            turnDiv.className = "fulltext-turn-block";
+            turnDiv.dataset.start = seg.start;
+
+            turnDiv.innerHTML = `
+                <div class="turn-header-line">
+                    <div class="turn-speaker-badge">
+                        <span class="avatar-dot" style="background-color: ${color};">${initial}</span>
+                        <strong style="color: ${color};">${escapeHtml(seg.speaker)}</strong>
+                    </div>
+                    <button class="turn-time-pill" title="Phát từ mốc thời gian này">
+                        <i class="fa-regular fa-circle-play"></i> ${escapeHtml(seg.start)}
+                    </button>
+                </div>
+                <div class="turn-text-paragraph">${escapeHtml(seg.text)}</div>
+            `;
+
+            turnDiv.querySelector(".turn-time-pill").addEventListener("click", () => {
+                seekMediaTo(seg.start);
+            });
+
+            fulltextDocContent.appendChild(turnDiv);
+        });
+    }
+
+    function copyFullText() {
+        if (!jobData) return;
+        let text = jobData.full_transcript_text || "";
+        if (!text && jobData.transcript) {
+            text = jobData.transcript.map(s => `[${s.start}] ${s.speaker}:\n${s.text}`).join("\n\n");
+        }
+        if (!text) {
+            showToast("Chưa có nội dung để sao chép", "info");
+            return;
+        }
+
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Đã sao chép toàn bộ bản ghi chép vào clipboard!", "success");
+        }).catch(() => {
+            showToast("Không thể sao chép văn bản", "error");
+        });
+    }
+
+    btnCopyFulltext?.addEventListener("click", copyFullText);
+    btnCopyDocText?.addEventListener("click", copyFullText);
+
+    // ----------------------------------------------------
+    // SYNCHRONIZED AUDIO & VIDEO PLAYERS
+    // ----------------------------------------------------
+    function setupVideoPlayer() {
+        if (!mainVideoPlayer) return;
+
+        mainVideoPlayer.addEventListener("timeupdate", onVideoTimeUpdate);
+        mainVideoPlayer.addEventListener("loadedmetadata", () => {
+            playerTotalTime.textContent = formatSec(mainVideoPlayer.duration);
+        });
+
+        mainVideoPlayer.addEventListener("play", () => {
+            mainAudioPlayer.pause();
+            btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        });
+
+        mainVideoPlayer.addEventListener("pause", () => {
+            btnPlayerPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+        });
+
+        btnToggleVideo?.addEventListener("click", () => {
+            videoWrapper?.classList.toggle("collapsed");
+            const isCol = videoWrapper?.classList.contains("collapsed");
+            btnToggleVideo.innerHTML = isCol ? '<i class="fa-solid fa-angle-down"></i>' : '<i class="fa-solid fa-angle-up"></i>';
+        });
+    }
+
+    function onVideoTimeUpdate() {
+        if (!isVideoActive || !mainVideoPlayer) return;
+        const cur = mainVideoPlayer.currentTime;
+        const dur = mainVideoPlayer.duration || 1;
+
+        playerCurrentTime.textContent = formatSec(cur);
+        playerScrubber.value = (cur / dur) * 100;
+        updateActiveSegmentHighlight(cur);
+    }
     function setupAudioPlayer() {
         mainAudioPlayer.addEventListener("timeupdate", onAudioTimeUpdate);
         mainAudioPlayer.addEventListener("loadedmetadata", () => {
-            playerTotalTime.textContent = formatSec(mainAudioPlayer.duration);
+            if (!isVideoActive) {
+                playerTotalTime.textContent = formatSec(mainAudioPlayer.duration);
+            }
         });
 
         btnPlayerPlay.addEventListener("click", () => {
-            if (mainAudioPlayer.paused) {
-                mainAudioPlayer.play();
-                btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            if (isVideoActive && mainVideoPlayer) {
+                if (mainVideoPlayer.paused) {
+                    mainVideoPlayer.play();
+                    mainAudioPlayer.pause();
+                    btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                } else {
+                    mainVideoPlayer.pause();
+                    btnPlayerPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+                }
             } else {
-                mainAudioPlayer.pause();
-                btnPlayerPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+                if (mainAudioPlayer.paused) {
+                    mainAudioPlayer.play();
+                    if (mainVideoPlayer) mainVideoPlayer.pause();
+                    btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                } else {
+                    mainAudioPlayer.pause();
+                    btnPlayerPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+                }
             }
         });
 
         playerScrubber.addEventListener("input", () => {
-            const seekTo = (playerScrubber.value / 100) * mainAudioPlayer.duration;
-            mainAudioPlayer.currentTime = seekTo;
+            const targetDuration = (isVideoActive && mainVideoPlayer && mainVideoPlayer.duration) ? mainVideoPlayer.duration : mainAudioPlayer.duration;
+            const seekTo = (playerScrubber.value / 100) * targetDuration;
+            if (isVideoActive && mainVideoPlayer) {
+                mainVideoPlayer.currentTime = seekTo;
+            } else {
+                mainAudioPlayer.currentTime = seekTo;
+            }
         });
 
         // Speed Cycling: 1.0 -> 1.25 -> 1.5 -> 2.0 -> 1.0
@@ -799,61 +1011,83 @@ document.addEventListener("DOMContentLoaded", () => {
             speedIdx = (speedIdx + 1) % speeds.length;
             const spd = speeds[speedIdx];
             mainAudioPlayer.playbackRate = spd;
+            if (mainVideoPlayer) mainVideoPlayer.playbackRate = spd;
             btnSpeed.textContent = `${spd.toFixed(1)}x`;
         });
 
         // Volume
         playerVolume.addEventListener("input", () => {
             mainAudioPlayer.volume = playerVolume.value;
+            if (mainVideoPlayer) mainVideoPlayer.volume = playerVolume.value;
         });
     }
 
     function onAudioTimeUpdate() {
+        if (isVideoActive) return; // Video timeupdate handles it when video is active
         const cur = mainAudioPlayer.currentTime;
         const dur = mainAudioPlayer.duration || 1;
 
         playerCurrentTime.textContent = formatSec(cur);
         playerScrubber.value = (cur / dur) * 100;
-
-        // Find active transcript segment
-        if (jobData && jobData.transcript) {
-            let activeSeg = null;
-            let activeIdx = -1;
-
-            jobData.transcript.forEach((seg, idx) => {
-                const s = parseTs(seg.start);
-                const e = parseTs(seg.end) || (s + 5);
-                if (cur >= s && cur <= e) {
-                    activeSeg = seg;
-                    activeIdx = idx;
-                }
-            });
-
-            // Update speaking badge
-            if (activeSeg) {
-                playerSpeakingBadge.classList.remove("hidden");
-                speakingNowName.textContent = activeSeg.speaker;
-            } else {
-                playerSpeakingBadge.classList.add("hidden");
-            }
-
-            // Highlight segment row
-            const rows = transcriptFeed.querySelectorAll(".transcript-segment");
-            rows.forEach((r, idx) => {
-                if (idx === activeIdx) {
-                    r.classList.add("active-segment");
-                } else {
-                    r.classList.remove("active-segment");
-                }
-            });
-        }
+        updateActiveSegmentHighlight(cur);
     }
 
-    function seekAudioTo(timestampStr) {
+    function updateActiveSegmentHighlight(cur) {
+        if (!jobData || !jobData.transcript) return;
+        let activeSeg = null;
+        let activeIdx = -1;
+
+        jobData.transcript.forEach((seg, idx) => {
+            const s = parseTs(seg.start);
+            const e = parseTs(seg.end) || (s + 5);
+            if (cur >= s && cur <= e) {
+                activeSeg = seg;
+                activeIdx = idx;
+            }
+        });
+
+        // Update speaking badge
+        if (activeSeg) {
+            playerSpeakingBadge.classList.remove("hidden");
+            speakingNowName.textContent = activeSeg.speaker;
+        } else {
+            playerSpeakingBadge.classList.add("hidden");
+        }
+
+        // Highlight segment row in timeline feed
+        const rows = transcriptFeed.querySelectorAll(".transcript-segment");
+        rows.forEach((r, idx) => {
+            if (idx === activeIdx) {
+                r.classList.add("active-segment");
+            } else {
+                r.classList.remove("active-segment");
+            }
+        });
+
+        // Highlight segment in fulltext document
+        const turns = fulltextDocContent?.querySelectorAll(".fulltext-turn-block");
+        turns?.forEach((t, idx) => {
+            if (idx === activeIdx) {
+                t.classList.add("active-turn");
+            } else {
+                t.classList.remove("active-turn");
+            }
+        });
+    }
+
+    function seekMediaTo(timestampStr) {
         const sec = parseTs(timestampStr);
-        mainAudioPlayer.currentTime = sec;
-        mainAudioPlayer.play();
-        btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        if (isVideoActive && mainVideoPlayer) {
+            mainAudioPlayer.pause();
+            mainVideoPlayer.currentTime = sec;
+            mainVideoPlayer.play();
+            btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        } else {
+            if (mainVideoPlayer) mainVideoPlayer.pause();
+            mainAudioPlayer.currentTime = sec;
+            mainAudioPlayer.play();
+            btnPlayerPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        }
     }
 
     function parseTs(str) {
