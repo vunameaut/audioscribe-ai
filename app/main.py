@@ -278,7 +278,13 @@ async def start_process(
 
 @app.get("/api/job/{job_id}")
 async def get_job_info(job_id: str):
-    job = JOBS.get(job_id) or load_job_state(job_id)
+    job = JOBS.get(job_id)
+    # Always check disk if not in memory or still marked uploaded/processing
+    if not job or job.get("status") not in ("completed", "failed"):
+        disk_job = load_job_state(job_id)
+        if disk_job:
+            job = disk_job
+
     if not job:
         raise HTTPException(status_code=404, detail="Không tìm thấy phiên làm việc.")
     return job

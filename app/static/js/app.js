@@ -250,29 +250,38 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------------------------------------------
     // DROPZONE & FILE UPLOAD
     // ----------------------------------------------------
+    let isUploading = false;
+
     dropzone.addEventListener("click", (e) => {
         if (e.target.closest("#btn-remove-file")) return;
+        fileInput.value = "";
         fileInput.click();
     });
 
     dropzone.addEventListener("dragover", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropzone.classList.add("dragover");
     });
 
-    dropzone.addEventListener("dragleave", () => {
+    dropzone.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         dropzone.classList.remove("dragover");
     });
 
     dropzone.addEventListener("drop", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropzone.classList.remove("dragover");
-        if (e.dataTransfer.files.length > 0) {
+        if (isUploading) return;
+        if (e.dataTransfer && e.dataTransfer.files.length > 0) {
             handleFileUpload(e.dataTransfer.files[0]);
         }
     });
 
     fileInput.addEventListener("change", () => {
+        if (isUploading) return;
         if (fileInput.files.length > 0) {
             handleFileUpload(fileInput.files[0]);
         }
@@ -286,6 +295,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function resetUploadState() {
         currentJobId = null;
         fileInput.value = "";
+        isUploading = false;
         dropzone.querySelector(".dropzone-content").classList.remove("hidden");
         fileInfoPreview.classList.add("hidden");
         audioPreviewContainer.classList.add("hidden");
@@ -300,6 +310,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function handleFileUpload(file) {
+        if (isUploading) return;
+        isUploading = true;
         showToast("Đang tải file lên hệ thống...", "info");
         btnStartProcess.disabled = true;
 
@@ -361,6 +373,8 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             showToast(e.message, "error");
             resetUploadState();
+        } finally {
+            isUploading = false;
         }
     }
 
@@ -369,6 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------------------------------------------
     btnStartProcess.addEventListener("click", async () => {
         if (!currentJobId) return;
+        const jobToProcess = currentJobId; // Lock target job ID
 
         const mode = getSelectedMode();
         const apiKey = localStorage.getItem("gemini_api_key") || "";
@@ -379,6 +394,8 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast("Vui lòng cấu hình Gemini API Key trước khi bắt đầu!", "error");
             return;
         }
+
+        btnStartProcess.disabled = true;
 
         // Switch to progress view
         setupSection.classList.add("hidden");
@@ -391,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Submit process request
         const modelToUse = (mode === "gemini") ? geminiModel : "small";
         const formData = new FormData();
-        formData.append("job_id", currentJobId);
+        formData.append("job_id", jobToProcess);
         formData.append("mode", mode);
         formData.append("api_key", apiKey);
         formData.append("model_name", modelToUse);
@@ -416,14 +433,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(err.detail || "Không thể khởi chạy tiến trình");
             }
 
-            // Start polling
-            pollJobStatus(currentJobId);
+            // Start polling with fixed job ID
+            pollJobStatus(jobToProcess);
 
         } catch (e) {
             showToast(e.message, "error");
             stopTimer();
             setupSection.classList.remove("hidden");
             progressSection.classList.add("hidden");
+            btnStartProcess.disabled = false;
         }
     });
 
